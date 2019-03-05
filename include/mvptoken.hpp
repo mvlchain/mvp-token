@@ -18,6 +18,7 @@ namespace eosio {
                       asset  maximum_supply);
 
          ACTION issue( name to, asset quantity, string memo );
+         ACTION decrease( name to, asset quantity, string memo );
 
          ACTION retire( asset quantity, string memo );
 

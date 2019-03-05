@@ -19,6 +19,38 @@ ACTION mvptoken::create( name issuer, asset maximum_supply ) {
     });
 }
 
+ACTION mvptoken::decrease( name to, asset quantity, string memo ) {
+    auto sym = quantity.symbol;
+    eosio_assert( sym.is_valid(), "invalid symbol name" );
+    eosio_assert( memo.size() <= 256, "memo has more than 256 bytes" );
+
+    stats statstable( _self, sym.code().raw() );
+    auto existing = statstable.find( sym.code().raw() );
+    eosio_assert( existing != statstable.end(), "token with symbol does not exist, create token before issue" );
+    const auto& st = *existing;
+
+    require_auth( st.issuer );
+    eosio_assert( quantity.is_valid(), "invalid quantity" );
+    eosio_assert( quantity.amount > 0, "must issue positive quantity" );
+
+    eosio_assert( quantity.symbol == st.supply.symbol, "symbol precision mismatch" );
+    eosio_assert( quantity.amount <= st.max_supply.amount - st.supply.amount, "quantity exceeds available supply");
+
+    statstable.modify( st, same_payer, [&]( auto& s ) {
+       s.supply -= quantity;
+    });
+
+    sub_balance( st.issuer, quantity );
+
+    if ( to != st.issuer ) {
+      require_recipient( st.issuer );
+      require_recipient( to );
+
+      add_balance( st.issuer, quantity, st.issuer );
+      sub_balance( to, quantity );
+    }
+}
+
 ACTION mvptoken::issue( name to, asset quantity, string memo ) {
     auto sym = quantity.symbol;
     eosio_assert( sym.is_valid(), "invalid symbol name" );
@@ -156,4 +188,4 @@ void mvptoken::close( name owner, const symbol& symbol )
    acnts.erase( it );
 }
 
-EOSIO_DISPATCH( mvptoken, (issue)(create)(setmaxsupply)(open)(retire)(close) )
+EOSIO_DISPATCH( mvptoken, (issue)(create)(setmaxsupply)(open)(retire)(close)(decrease) )
